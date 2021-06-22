@@ -9,13 +9,14 @@
 
 namespace WordPressCS\WordPress\Sniffs\NamingConventions;
 
-use WordPressCS\WordPress\AbstractFunctionParameterSniff;
 use PHP_CodeSniffer\Util\Tokens;
 use PHPCSUtils\BackCompat\Helper;
 use PHPCSUtils\Utils\Lists;
 use PHPCSUtils\Utils\Namespaces;
 use PHPCSUtils\Utils\Scopes;
 use PHPCSUtils\Utils\TextStrings;
+use WordPressCS\WordPress\AbstractFunctionParameterSniff;
+use WordPressCS\WordPress\Helpers\IsUnitTestTrait;
 
 /**
  * Verify that everything defined in the global namespace is prefixed with a theme/plugin specific prefix.
@@ -28,9 +29,11 @@ use PHPCSUtils\Utils\TextStrings;
  * @since   2.2.0  - Now also checks variables assigned via the list() construct.
  *                 - Now also ignores global functions which are marked as @deprecated.
  *
- * @uses    \WordPressCS\WordPress\Sniff::$custom_test_class_whitelist
+ * @uses    \WordPressCS\WordPress\Helpers\IsUnitTestTrait::$custom_test_classes
  */
 class PrefixAllGlobalsSniff extends AbstractFunctionParameterSniff {
+
+	use IsUnitTestTrait;
 
 	/**
 	 * Error message template.
@@ -269,9 +272,12 @@ class PrefixAllGlobalsSniff extends AbstractFunctionParameterSniff {
 	public function process_token( $stackPtr ) {
 
 		// Allow overruling the prefixes set in a ruleset via the command line.
-		$cl_prefixes = trim( Helper::getConfigData( 'prefixes' ) );
+		$cl_prefixes = Helper::getConfigData( 'prefixes' );
 		if ( ! empty( $cl_prefixes ) ) {
-			$this->prefixes = array_filter( array_map( 'trim', explode( ',', $cl_prefixes ) ) );
+			$cl_prefixes = trim( $cl_prefixes );
+			if ( '' !== $cl_prefixes ) {
+				$this->prefixes = array_filter( array_map( 'trim', explode( ',', $cl_prefixes ) ) );
+			}
 		}
 
 		$this->prefixes = $this->merge_custom_array( $this->prefixes, array(), false );
@@ -288,7 +294,7 @@ class PrefixAllGlobalsSniff extends AbstractFunctionParameterSniff {
 
 		// Ignore test classes.
 		if ( isset( Tokens::$ooScopeTokens[ $this->tokens[ $stackPtr ]['code'] ] )
-			&& true === $this->is_test_class( $stackPtr )
+			&& true === $this->is_test_class( $this->phpcsFile, $stackPtr )
 		) {
 			if ( $this->tokens[ $stackPtr ]['scope_condition'] === $stackPtr && isset( $this->tokens[ $stackPtr ]['scope_closer'] ) ) {
 				// Skip forward to end of test class.
